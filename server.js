@@ -19,24 +19,26 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// ===== CONFIGURACIÓN DE CORS =====
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
-
-// Agregar dominios de producción si está en producción
-if (process.env.NODE_ENV === 'production') {
-  allowedOrigins.push('https://jarvis-frontend.vercel.app');
-  allowedOrigins.push('https://jarvis-frontend-74pd.vercel.app');
-}
-
-console.log('🔓 CORS permitiendo orígenes:', allowedOrigins);
+// Configuración de CORS - más permisiva para pruebas
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'https://jarvis-frontend-ten-tau.vercel.app',
+  'https://jarvis-frontend-74pd.vercel.app',
+  'https://jarvis-frontend.vercel.app'
+];
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Permitir peticiones sin origen (como Postman)
+    // Permitir peticiones sin origen (Postman, etc.)
     if (!origin) return callback(null, true);
     
+    // Permitir cualquier origen en desarrollo
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    // En producción, verificar lista blanca
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
