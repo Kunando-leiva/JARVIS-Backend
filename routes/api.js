@@ -17,13 +17,19 @@ router.post('/ask', async (req, res) => {
     
     const response = await groqService.getJarvisResponse(text, userName, history);
     
-    // Forzar TTS para que HABLE la respuesta
+    // ⚠️ NO llamar a localhost en producción
     if (response.text && response.text.trim() !== '') {
-      fetch('http://127.0.0.1:3001/api/speak', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: response.text })
-      }).catch(err => console.error('Error TTS:', err.message));
+      if (process.env.NODE_ENV !== 'production') {
+        // Solo en desarrollo, llamar al TTS local
+        fetch('http://127.0.0.1:3001/api/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: response.text })
+        }).catch(err => console.error('Error TTS:', err.message));
+      } else {
+        // En producción, el frontend maneja el TTS
+        console.log('Producción: el frontend manejará el TTS');
+      }
     }
     
     res.json({ success: true, text: response.text, action: response.action });
@@ -48,6 +54,8 @@ router.post('/transcribe', upload.single('audio'), async (req, res) => {
 });
 
 // Endpoint para texto a voz (TTS)
+// server/routes/api.js - ENDPOINT /speak MODIFICADO
+
 router.post('/speak', async (req, res) => {
   try {
     const { text } = req.body;
@@ -58,17 +66,33 @@ router.post('/speak', async (req, res) => {
     
     console.log(`🎤 Generando voz para: "${text.substring(0, 50)}..."`);
     
-    const audioBuffer = await edgeTtsService.textToSpeech(text);
-    
-    if (audioBuffer) {
-      res.set('Content-Type', 'audio/mpeg');
-      res.send(audioBuffer);
-    } else {
-      res.json({ fallback: true, text });
+    // En producción, usamos el fallback del navegador
+    if (process.env.NODE_ENV === 'production') {
+      return res.json({ fallback: true, text });
     }
+    
+    // En desarrollo, intentar con edge-tts
+    try {
+      const audioBuffer = await edgeTtsService.textToSpeech(text);
+      if (audioBuffer) {
+        res.set('Content-Type', 'audio/mpeg');
+        return res.send(audioBuffer);
+      }
+    } catch (error) {
+      console.log('Edge TTS falló, usando fallback');
+    }
+    
+    // Fallback para todos los casos
+    res.json({ fallback: true, text });
+    
   } catch (error) {
     console.error('Error en /speak:', error);
-    res.status(500).json({ error: 'No pude generar la voz' });
+    // En producción, devolver fallback en lugar de error
+    if (process.env.NODE_ENV === 'production') {
+      res.json({ fallback: true, text });
+    } else {
+      res.status(500).json({ error: 'No pude generar la voz' });
+    }
   }
 });
 
