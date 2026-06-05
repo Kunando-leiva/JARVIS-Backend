@@ -11,22 +11,26 @@ import { securityService } from './services/securityService.js';
 import { authMiddleware, rateLimitMiddleware } from './middleware/auth.js';
 import rateLimit from 'express-rate-limit';
 import { initLearningDB } from './services/learningService.js';
-import cors from 'cors';
 
 dotenv.config();
 
-import cors from 'cors';
+// ===== INICIALIZAR APP PRIMERO =====
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
 
-// Configurar CORS para permitir el frontend en Vercel
+// ===== CONFIGURACIÓN DE CORS =====
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:3000', 'http://127.0.0.1:3000'];
 
-// Si está en producción, permitir también el dominio de Vercel
+// Agregar dominios de producción si está en producción
 if (process.env.NODE_ENV === 'production') {
   allowedOrigins.push('https://jarvis-frontend.vercel.app');
   allowedOrigins.push('https://jarvis-frontend-74pd.vercel.app');
 }
+
+console.log('🔓 CORS permitiendo orígenes:', allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -45,25 +49,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
 }));
 
-// Manejar preflight requests
-app.options('*', cors());
-
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
 // ===== SECURITY HEADERS =====
 app.use(securityService.securityHeaders);
-
-// ===== CORS RESTRINGIDO =====
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? (process.env.ALLOWED_ORIGINS || 'https://tudominio.com').split(',')
-  : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173'];
-
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
-}));
 
 // ===== LIMITAR TAMAÑO DE PETICIONES =====
 app.use(express.json({ limit: '1mb' }));

@@ -135,4 +135,9 @@ router.get('/search/stats', async (req, res) => {
   }
 });
 
+// Endpoint de prueba (sin dependencias complejas)
+router.get('/ping', (req, res) => {
+  res.json({ success: true, message: 'pong', timestamp: Date.now() });
+});
+
 export default router;
