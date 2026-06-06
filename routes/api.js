@@ -3,9 +3,107 @@ import express from 'express';
 import { groqService } from '../services/groqService.js';
 import { edgeTtsService } from '../services/edgeTtsService.js';
 import multer from 'multer';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
+// ===== ENDPOINTS PARA LEER CÓDIGO DEL SERVIDOR =====
+
+// Listar archivos del proyecto
+router.get('/list-files', async (req, res) => {
+  try {
+    const directories = ['services', 'routes', 'middleware', 'services/aiProviders'];
+    const allFiles = [];
+    
+    for (const dir of directories) {
+      const fullPath = path.join(__dirname, '../', dir);
+      try {
+        const files = await fs.readdir(fullPath);
+        const jsFiles = files.filter(f => f.endsWith('.js')).map(f => `${dir}/${f}`);
+        allFiles.push(...jsFiles);
+      } catch (e) {
+        // Directorio no existe
+      }
+    }
+    
+    res.json({
+      success: true,
+      files: allFiles,
+      total: allFiles.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Leer código de un archivo
+router.post('/read-code', async (req, res) => {
+  try {
+    const { filePath } = req.body;
+    
+    if (!filePath || !filePath.endsWith('.js')) {
+      return res.status(400).json({ error: 'Solo se permiten archivos .js' });
+    }
+    
+    // Evitar acceso a archivos del sistema
+    if (filePath.includes('..') || filePath.includes('env')) {
+      return res.status(403).json({ error: 'Acceso denegado' });
+    }
+    
+    const fullPath = path.join(__dirname, '../', filePath);
+    const content = await fs.readFile(fullPath, 'utf-8');
+    
+    const maxLength = 5000;
+    const truncated = content.length > maxLength;
+    
+    res.json({
+      success: true,
+      filePath: filePath,
+      content: truncated ? content.substring(0, maxLength) + '\n... (código truncado)' : content,
+      totalLines: content.split('\n').length,
+      truncated: truncated
+    });
+  } catch (error) {
+    res.status(404).json({ error: `No se pudo leer el archivo: ${error.message}` });
+  }
+});
+
+// Estadísticas de un archivo
+router.post('/code-stats', async (req, res) => {
+  try {
+    const { filePath } = req.body;
+    
+    if (!filePath || !filePath.endsWith('.js')) {
+      return res.status(400).json({ error: 'Solo se permiten archivos .js' });
+    }
+    
+    const fullPath = path.join(__dirname, '../', filePath);
+    const content = await fs.readFile(fullPath, 'utf-8');
+    const lines = content.split('\n');
+    
+    const functionMatches = content.match(/function\s+\w+\s*\(|async\s+function\s+\w+\s*\(|const\s+\w+\s*=\s*async?\s*\(/g) || [];
+    const commentMatches = content.match(/\/\/.*/g) || [];
+    
+    res.json({
+      success: true,
+      filePath: filePath,
+      stats: {
+        totalLines: lines.length,
+        functions: functionMatches.length,
+        comments: commentMatches.length,
+        sizeKB: (content.length / 1024).toFixed(2)
+      }
+    });
+  } catch (error) {
+    res.status(404).json({ error: error.message });
+  }
+});
 
 // Endpoint para procesar texto (CON TTS INTEGRADO)
 router.post('/ask', async (req, res) => {
