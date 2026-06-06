@@ -25,20 +25,13 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
   'https://jarvis-frontend-ten-tau.vercel.app',
   'https://jarvis-frontend-74pd.vercel.app',
-  'https://jarvis-frontend.vercel.app'
+  'https://jarvis-frontend.vercel.app',
+  'https://jarvis-frontend-ochre.vercel.app'  // Agregado el que faltaba
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Permitir peticiones sin origen (Postman, etc.)
     if (!origin) return callback(null, true);
-    
-    // Permitir cualquier origen en desarrollo
-    if (process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-    
-    // En producción, verificar lista blanca
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
