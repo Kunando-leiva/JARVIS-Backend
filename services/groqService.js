@@ -982,6 +982,54 @@ ${resources.map(r => `• **${r.name}**: ${r.url}`).join('\n')}
         updateConversationContext(userName, userMessage, resourcesText, null);
         return { text: resourcesText, action: null };
       }
+
+
+      // Crear archivo
+else if (localCommand.type === 'CREATE_FILE') {
+  const filePath = localCommand.filePath;
+  // Aquí esperarías que JARVIS te pase el contenido
+  const message = `¿Qué código quieres poner en ${filePath}? Escríbelo y te lo guardaré.`;
+  setResponse(message);
+  await speakText(message);
+  // Guardar temporalmente el archivo que quiere crear
+  window.pendingFilePath = filePath;
+  window.waitingForFileContent = true;
+  setIsProcessing(false);
+  return;
+}
+
+// Procesar contenido cuando el usuario lo envía
+if (window.waitingForFileContent && text) {
+  window.waitingForFileContent = false;
+  const filePath = window.pendingFilePath;
+  const content = text;
+  
+  try {
+    const res = await axios.post(`${API_URL}/api/create-file`, 
+      { filePath, content },
+      { headers: getHeaders() }
+    );
+    
+    if (res.data.success) {
+      const message = `✅ Archivo ${filePath} creado correctamente.`;
+      setResponse(message);
+      await speakText(message);
+    }
+  } catch (error) {
+    const message = `No pude crear el archivo: ${error.response?.data?.error || error.message}`;
+    setResponse(message);
+    await speakText(message);
+  }
+  return;
+}
+
+
+
+
+
+
+
+
       
       // ===== PROCESAR EVALUATE_CODE =====
       if (localCommand && localCommand.type === 'EVALUATE_CODE') {

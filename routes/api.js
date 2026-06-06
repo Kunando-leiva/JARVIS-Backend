@@ -6,6 +6,7 @@ import multer from 'multer';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { weatherService } from '../services/weatherService.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -262,4 +263,124 @@ router.get('/ping', (req, res) => {
   res.json({ success: true, message: 'pong', timestamp: Date.now() });
 });
 
+
+// Servir archivo de voz personalizado
+router.get('/voice/:filename', (req, res) => {
+  const { filename } = req.params;
+  
+  // Validar seguridad (solo archivos .mp3 en la carpeta voices)
+  if (!filename.endsWith('.mp3')) {
+    return res.status(400).json({ error: 'Solo se permiten archivos MP3' });
+  }
+  
+  const filePath = path.join(__dirname, '../voices', filename);
+  
+  // Verificar si el archivo existe
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Archivo de voz no encontrado' });
+  }
+  
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.sendFile(filePath);
+});
+
+// Endpoint para listar voces disponibles
+router.get('/voice-list', (req, res) => {
+  const voicesDir = path.join(__dirname, '../voices');
+  try {
+    const files = fs.readdirSync(voicesDir);
+    const mp3Files = files.filter(f => f.endsWith('.mp3'));
+    res.json({ success: true, voices: mp3Files });
+  } catch (error) {
+    res.json({ success: true, voices: [] });
+  }
+});
+
+
+// ===== ENDPOINT PARA CREAR ARCHIVOS (solo en desarrollo/local) =====
+router.post('/create-file', async (req, res) => {
+  try {
+    const { filePath, content } = req.body;
+    
+    if (!filePath || !content) {
+      return res.status(400).json({ error: 'Faltan parámetros: filePath y content' });
+    }
+    
+    // Validar seguridad - solo archivos .js en carpetas permitidas
+    if (!filePath.endsWith('.js')) {
+      return res.status(400).json({ error: 'Solo se permiten archivos .js' });
+    }
+    
+    // Evitar accesos peligrosos
+    if (filePath.includes('..') || filePath.includes('.env') || filePath.includes('node_modules')) {
+      return res.status(403).json({ error: 'Acceso denegado por seguridad' });
+    }
+    
+    const fullPath = path.join(__dirname, '../', filePath);
+    
+    // Crear directorio si no existe
+    const dir = path.dirname(fullPath);
+    await fs.mkdir(dir, { recursive: true });
+    
+    // Escribir archivo
+    await fs.writeFile(fullPath, content, 'utf-8');
+    
+    res.json({ 
+      success: true, 
+      message: `✅ Archivo ${filePath} creado correctamente`,
+      path: fullPath
+    });
+  } catch (error) {
+    console.error('Error creando archivo:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== ENDPOINT PARA AGREGAR CÓDIGO A UN ARCHIVO EXISTENTE =====
+router.post('/append-to-file', async (req, res) => {
+  try {
+    const { filePath, content, position = 'end' } = req.body;
+    
+    if (!filePath || !content) {
+      return res.status(400).json({ error: 'Faltan parámetros' });
+    }
+    
+    const fullPath = path.join(__dirname, '../', filePath);
+    
+    // Crear backup automático
+    const backupPath = `${fullPath}.backup_${Date.now()}`;
+    const originalContent = await fs.readFile(fullPath, 'utf-8').catch(() => '');
+    await fs.writeFile(backupPath, originalContent);
+    
+    let newContent;
+    if (position === 'end') {
+      newContent = originalContent + '\n\n// ===== AGREGADO POR JARVIS =====\n' + content;
+    } else {
+      newContent = '// ===== AGREGADO POR JARVIS =====\n' + content + '\n\n' + originalContent;
+    }
+    
+    await fs.writeFile(fullPath, newContent, 'utf-8');
+    
+    res.json({ 
+      success: true, 
+      message: `✅ Código agregado a ${filePath}`,
+      backup: path.basename(backupPath)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint para clima
+router.get('/weather/:city', async (req, res) => {
+  try {
+    const { city } = req.params;
+    const weather = await weatherService.getCurrentWeather(city);
+    res.json(weather);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
+

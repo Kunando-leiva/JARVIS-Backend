@@ -304,14 +304,22 @@ export const actionService = {
         return { success: true, message: `Abriendo ${url}` };
       
       case 'CLIMA':
-        const ciudad = param || 'Buenos Aires';
-        try {
-          const response = await axios.get(`https://wttr.in/${ciudad}?format=%C+%t&lang=es`);
-          const clima = response.data;
-          return { success: true, message: `En ${ciudad}: ${clima}` };
-        } catch {
-          return { success: false, message: `No pude obtener el clima de ${ciudad}` };
-        }
+  try {
+    const { weatherService } = await import('./weatherService.js');
+    const ciudad = param || 'Buenos Aires';
+    const weather = await weatherService.getCurrentWeather(ciudad);
+    
+    if (weather.success) {
+      return { 
+        success: true, 
+        message: `En ${weather.city}, la temperatura es de ${weather.temperature}°C, con ${weather.description}.` 
+      };
+    } else {
+      return { success: false, message: `No pude obtener el clima de ${ciudad}` };
+    }
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
       
       case 'NOTICIAS':
         try {
