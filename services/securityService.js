@@ -54,24 +54,17 @@ export const securityService = {
     return sanitized;
   },
   
- // Headers de seguridad para HTTP
-securityHeaders(req, res, next) {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  // CSP modificado para permitir Google Translate
-  res.setHeader('Content-Security-Policy', 
-    "default-src 'self' https:; " +
-    "script-src 'self' 'unsafe-inline' https://translate.googleapis.com https://www.gstatic.com; " +
-    "style-src 'self' 'unsafe-inline' https://www.gstatic.com; " +
-    "font-src 'self' data: https://www.gstatic.com; " +
-    "connect-src 'self' https://translate.googleapis.com;"
-  );
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  next();
-},
+  // Headers de seguridad para HTTP
+  securityHeaders(req, res, next) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Content-Security-Policy', "default-src 'self'");
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    next();
+  },
   
   // Log de actividades sospechosas
   async logSecurityEvent(event) {

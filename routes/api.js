@@ -382,5 +382,68 @@ router.get('/weather/:city', async (req, res) => {
   }
 });
 
+// Endpoint de diagnóstico para probar proveedores
+router.post('/diagnostico', async (req, res) => {
+  try {
+    const { providerManager } = await import('../services/aiProviders/providerManager.js');
+    const { groqService } = await import('../services/groqService.js');
+    
+    // 1. Verificar estado de proveedores
+    const stats = providerManager.getStats();
+    
+    // 2. Probar cada proveedor directamente
+    const testMessages = [{ role: 'user', content: 'Responde solo con la palabra "OK"' }];
+    
+    const results = [];
+    
+    for (const provider of providerManager.providers) {
+      try {
+        const start = Date.now();
+        const response = await provider.chat(testMessages, { maxTokens: 10 });
+        const time = Date.now() - start;
+        
+        results.push({
+          provider: provider.name,
+          success: response.success,
+          responseTime: time,
+          error: response.error || null,
+          content: response.success ? response.content.substring(0, 50) : null
+        });
+      } catch (error) {
+        results.push({
+          provider: provider.name,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+    
+    // 3. Verificar variables de entorno
+    const envVars = {
+      GROQ_API_KEY: process.env.GROQ_API_KEY ? '✅ Configurada' : '❌ No configurada',
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ? '✅ Configurada' : '❌ No configurada',
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY ? '✅ Configurada' : '❌ No configurada',
+      CEREBRAS_API_KEY: process.env.CEREBRAS_API_KEY ? '✅ Configurada' : '❌ No configurada',
+    };
+    
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      providers: stats,
+      testResults: results,
+      environmentVariables: envVars,
+      totalProviders: providerManager.providers.length,
+      healthyCount: results.filter(r => r.success).length
+    });
+    
+  } catch (error) {
+    console.error('Error en diagnóstico:', error);
+    res.status(500).json({ 
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 export default router;
 
